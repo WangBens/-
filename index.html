@@ -1,0 +1,809 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="工業配線術科：電阻尺、變頻馬達與條碼掃描器綜合控制互動模擬">
+  <title>工業配線｜互動控制模擬器</title>
+  <style>
+    :root {
+      --ink: #12202a;
+      --muted: #63717a;
+      --paper: #f3f0e7;
+      --panel: #fbfaf5;
+      --line: #d8d2c4;
+      --orange: #f2643d;
+      --orange-dark: #c74524;
+      --blue: #1c6d8c;
+      --blue-dark: #12465c;
+      --green: #81c784;
+      --yellow: #ffd43b;
+      --danger: #dc3545;
+      --shadow: 0 18px 45px rgba(18, 32, 42, .12);
+      --radius: 24px;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      min-width: 320px;
+      color: var(--ink);
+      background:
+        linear-gradient(rgba(18, 32, 42, .035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(18, 32, 42, .035) 1px, transparent 1px),
+        var(--paper);
+      background-size: 28px 28px;
+      font-family: "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif;
+    }
+
+    button, input { font: inherit; }
+    button { -webkit-tap-highlight-color: transparent; }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 14px clamp(18px, 4vw, 56px);
+      color: white;
+      background: rgba(18, 32, 42, .94);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid rgba(255,255,255,.12);
+    }
+
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand-mark {
+      display: grid;
+      place-items: center;
+      width: 38px;
+      height: 38px;
+      border: 2px solid white;
+      border-radius: 10px;
+      color: var(--yellow);
+      font-weight: 900;
+      transform: rotate(-3deg);
+    }
+    .brand strong { display: block; font-size: 15px; letter-spacing: .12em; }
+    .brand span { display: block; color: #aebbc3; font-size: 11px; letter-spacing: .08em; }
+
+    .header-status { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+    .status-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: #76818a;
+      box-shadow: 0 0 0 5px rgba(255,255,255,.06);
+    }
+    .status-dot.on { background: var(--green); box-shadow: 0 0 14px rgba(129,199,132,.75); }
+
+    main { width: min(1440px, calc(100% - 32px)); margin: 0 auto; padding: 48px 0 72px; }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 32px;
+      align-items: end;
+      margin-bottom: 30px;
+    }
+    .eyebrow {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 0 0 12px;
+      color: var(--orange-dark);
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+    }
+    .eyebrow::before { content: ""; width: 30px; height: 3px; background: var(--orange); }
+    h1 {
+      max-width: 900px;
+      margin: 0;
+      font-size: clamp(34px, 5vw, 68px);
+      line-height: 1.03;
+      letter-spacing: -.055em;
+    }
+    .hero p {
+      max-width: 760px;
+      margin: 18px 0 0;
+      color: var(--muted);
+      font-size: clamp(15px, 1.6vw, 18px);
+      line-height: 1.75;
+    }
+
+    .hero-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 44px;
+      padding: 0 18px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      color: var(--ink);
+      background: var(--panel);
+      font-weight: 800;
+      cursor: pointer;
+      transition: transform .16s ease, box-shadow .16s ease, background .16s ease;
+    }
+    .btn:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(18,32,42,.12); }
+    .btn:active { transform: translateY(0); }
+    .btn:focus-visible, .barcode-card:focus-visible, input:focus-visible { outline: 3px solid rgba(28,109,140,.35); outline-offset: 3px; }
+    .btn.primary { color: white; border-color: var(--orange); background: var(--orange); }
+    .btn.dark { color: white; border-color: var(--ink); background: var(--ink); }
+    .btn.ghost { background: transparent; }
+    .btn:disabled { opacity: .42; cursor: not-allowed; transform: none; box-shadow: none; }
+
+    .control-board {
+      overflow: hidden;
+      border: 1px solid #c9c2b3;
+      border-radius: 30px;
+      background: #d9d4c7;
+      box-shadow: var(--shadow);
+    }
+    .board-rail {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 13px 20px;
+      color: white;
+      background: var(--ink);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .1em;
+    }
+    .warning-stripe {
+      width: 130px;
+      height: 12px;
+      border-radius: 3px;
+      background: repeating-linear-gradient(135deg, var(--yellow) 0 10px, var(--ink) 10px 20px);
+    }
+    .board-grid {
+      display: grid;
+      grid-template-columns: 1.05fr 1.2fr 1.05fr;
+      gap: 18px;
+      padding: 22px;
+    }
+    .module {
+      min-width: 0;
+      padding: 20px;
+      border: 1px solid #beb7aa;
+      border-radius: 18px;
+      background: var(--panel);
+      box-shadow: inset 0 1px white, 0 8px 20px rgba(18,32,42,.08);
+    }
+    .module-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .module-title h2, .module-title h3 { margin: 0; font-size: 15px; letter-spacing: .05em; }
+    .tag { padding: 5px 9px; border-radius: 999px; color: var(--muted); background: #ece8dd; font: 800 11px/1 system-ui; }
+
+    .ruler-stage {
+      position: relative;
+      min-height: 194px;
+      padding: 22px 10px 14px;
+      border: 1px solid #d6d0c4;
+      border-radius: 14px;
+      background: #ece8df;
+      overflow: hidden;
+    }
+    .ruler-machine { position: relative; height: 96px; }
+    .ruler-body {
+      position: absolute;
+      left: 0;
+      top: 28px;
+      width: 36%;
+      height: 52px;
+      border: 3px solid var(--ink);
+      border-radius: 8px 2px 2px 8px;
+      background: linear-gradient(180deg, #aab3b8, #748189);
+      box-shadow: inset 0 0 0 5px rgba(255,255,255,.2);
+    }
+    .ruler-rod {
+      position: absolute;
+      left: 34%;
+      top: 43px;
+      height: 22px;
+      width: var(--rod-width, 42%);
+      min-width: 12%;
+      border: 2px solid #6b6b62;
+      background: repeating-linear-gradient(90deg, #f0c84d 0 8px, #d9b034 8px 9px);
+      transition: width .18s ease;
+    }
+    .ruler-handle {
+      position: absolute;
+      left: calc(34% + var(--rod-width, 42%));
+      top: 32px;
+      width: 25px;
+      height: 45px;
+      border: 3px solid var(--ink);
+      border-radius: 5px;
+      background: var(--orange);
+      transform: translateX(-2px);
+      transition: left .18s ease;
+    }
+    .safe-band {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 800;
+    }
+    .range-readout { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 15px; }
+    .range-readout strong { font: 900 28px/1 "Consolas", monospace; }
+    .range-state { font-size: 12px; font-weight: 900; color: var(--blue); }
+    .range-state.bad { color: var(--danger); }
+    input[type="range"] { width: 100%; margin: 15px 0 4px; accent-color: var(--orange); cursor: grab; }
+    input[type="range"]:active { cursor: grabbing; }
+
+    .hmi-shell {
+      position: relative;
+      padding: 14px;
+      border: 9px solid #2c3338;
+      border-radius: 16px;
+      background: #111b21;
+      box-shadow: inset 0 0 0 2px #59636a, 0 10px 22px rgba(18,32,42,.18);
+    }
+    .hmi-screen {
+      min-height: 226px;
+      padding: 14px;
+      border: 2px solid #0a303c;
+      border-radius: 7px;
+      color: #d8fbff;
+      background:
+        linear-gradient(rgba(100,220,237,.055) 1px, transparent 1px),
+        #0c3948;
+      background-size: 100% 23px;
+      box-shadow: inset 0 0 28px rgba(0,0,0,.55), 0 0 18px rgba(80,214,232,.15);
+    }
+    .hmi-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; font-size: 11px; color: #8ecad5; }
+    .hmi-badge { padding: 4px 7px; border: 1px solid #4c94a3; border-radius: 4px; }
+    .registers { display: grid; gap: 8px; }
+    .register {
+      display: grid;
+      grid-template-columns: 48px minmax(0,1fr) auto;
+      align-items: baseline;
+      gap: 10px;
+      padding: 8px 9px;
+      border-left: 3px solid #3d8fa0;
+      background: rgba(0,0,0,.2);
+    }
+    .register .name { color: #89d7e4; font: 700 12px "Consolas", monospace; }
+    .register .value { overflow: hidden; color: white; font: 900 clamp(18px, 2vw, 24px)/1 "Consolas", monospace; text-overflow: ellipsis; }
+    .register .unit { min-width: 34px; text-align: right; color: #8ecad5; font-size: 11px; }
+    .hmi-message { margin-top: 10px; color: #a8e8ef; font-size: 11px; line-height: 1.5; }
+
+    .lamp-row { display: flex; justify-content: center; gap: 34px; margin-bottom: 18px; }
+    .lamp-wrap { text-align: center; color: var(--muted); font: 800 11px/1.2 system-ui; }
+    .lamp {
+      width: 48px;
+      height: 48px;
+      margin: 0 auto 8px;
+      border: 7px solid #3a4145;
+      border-radius: 50%;
+      background: #596166;
+      box-shadow: inset 0 0 9px rgba(0,0,0,.7), 0 3px 0 #a9aaa4;
+    }
+    .lamp.gl.on { background: var(--green); box-shadow: inset 0 0 9px white, 0 0 24px rgba(80,210,100,.9), 0 3px 0 #a9aaa4; }
+    .lamp.yl.on { background: var(--yellow); box-shadow: inset 0 0 9px white, 0 0 26px rgba(255,212,59,.95), 0 3px 0 #a9aaa4; }
+
+    .motor-stage { display: grid; place-items: center; min-height: 130px; }
+    .motor {
+      position: relative;
+      width: 155px;
+      height: 94px;
+      border: 4px solid var(--ink);
+      border-radius: 46px 14px 14px 46px;
+      background: repeating-linear-gradient(90deg, #51798a 0 8px, #3f6879 8px 13px);
+      box-shadow: inset 0 6px rgba(255,255,255,.15), 0 12px 18px rgba(18,32,42,.15);
+    }
+    .motor::after { content: ""; position: absolute; right: -36px; top: 38px; width: 36px; height: 13px; border: 3px solid var(--ink); background: #9da7ac; }
+    .fan {
+      position: absolute;
+      left: 8px;
+      top: 10px;
+      width: 66px;
+      height: 66px;
+      border: 4px solid #172832;
+      border-radius: 50%;
+      background: conic-gradient(from 10deg, #a7cbd6 0 12deg, transparent 12deg 66deg, #a7cbd6 66deg 78deg, transparent 78deg 132deg, #a7cbd6 132deg 144deg, transparent 144deg 198deg, #a7cbd6 198deg 210deg, transparent 210deg 264deg, #a7cbd6 264deg 276deg, transparent 276deg 330deg, #a7cbd6 330deg 342deg, transparent 342deg);
+      transform: rotate(0deg);
+    }
+    .fan::after { content: ""; position: absolute; inset: 23px; border-radius: 50%; background: #172832; }
+    .motor.running .fan { animation: spin var(--spin-speed, .5s) linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .motor-base { position: absolute; left: 28px; right: 16px; bottom: -16px; height: 16px; border: 3px solid var(--ink); border-top: 0; background: #6b7a81; }
+    .motor-data { display: flex; justify-content: space-between; gap: 8px; width: 100%; margin-top: 20px; }
+    .motor-data div { flex: 1; padding: 9px; border-radius: 9px; background: #ece8df; text-align: center; }
+    .motor-data span { display: block; color: var(--muted); font-size: 10px; }
+    .motor-data strong { font: 900 15px "Consolas", monospace; }
+
+    .power-panel {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 16px 22px 20px;
+      border-top: 1px solid #bbb4a7;
+      background: rgba(255,255,255,.42);
+    }
+    .power-copy strong { display: block; margin-bottom: 3px; font-size: 14px; }
+    .power-copy span { color: var(--muted); font-size: 12px; }
+    .switch { position: relative; display: inline-flex; align-items: center; gap: 10px; color: var(--muted); font-size: 12px; font-weight: 900; cursor: pointer; }
+    .switch input { position: absolute; opacity: 0; pointer-events: none; }
+    .switch-track { position: relative; width: 68px; height: 34px; border-radius: 8px; background: #60696f; box-shadow: inset 0 3px 6px rgba(0,0,0,.35); transition: background .2s; }
+    .switch-knob { position: absolute; top: 4px; left: 4px; width: 28px; height: 26px; border-radius: 5px; background: #f7f3e8; box-shadow: 0 3px 7px rgba(0,0,0,.3); transition: transform .2s; }
+    .switch input:checked + .switch-track { background: var(--orange); }
+    .switch input:checked + .switch-track .switch-knob { transform: translateX(32px); }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: minmax(0, 1.35fr) minmax(320px, .65fr);
+      gap: 22px;
+      margin-top: 22px;
+    }
+    .card { border: 1px solid var(--line); border-radius: var(--radius); background: rgba(251,250,245,.92); box-shadow: 0 10px 28px rgba(18,32,42,.07); }
+    .card-head { display: flex; align-items: end; justify-content: space-between; gap: 18px; padding: 22px 24px 16px; border-bottom: 1px solid var(--line); }
+    .card-head h2 { margin: 0; font-size: clamp(19px, 2vw, 25px); }
+    .card-head p { margin: 5px 0 0; color: var(--muted); font-size: 13px; }
+    .speed-control { display: flex; gap: 5px; padding: 4px; border-radius: 10px; background: #eae6dc; }
+    .speed-control button { min-width: 43px; padding: 7px 8px; border: 0; border-radius: 7px; color: var(--muted); background: transparent; font-size: 11px; font-weight: 900; cursor: pointer; }
+    .speed-control button.active { color: white; background: var(--blue); }
+
+    .scanner-area { padding: 20px 24px 24px; }
+    .scanner-toolbar { display: grid; grid-template-columns: minmax(0,1fr) auto auto; gap: 12px; align-items: center; margin-bottom: 18px; }
+    .scanner-status { min-width: 0; padding: 11px 14px; border: 1px dashed #bbb3a4; border-radius: 12px; color: var(--muted); background: #f2efe7; font-size: 12px; }
+    .scanner-status strong { color: var(--ink); }
+    .barcode-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+    .barcode-card { position: relative; padding: 12px; border: 2px solid transparent; border-radius: 13px; background: #efede6; cursor: pointer; transition: transform .16s, border-color .16s, background .16s; }
+    .barcode-card:hover { transform: translateY(-2px); background: white; }
+    .barcode-card.selected { border-color: var(--orange); background: white; box-shadow: 0 7px 17px rgba(242,100,61,.14); }
+    .barcode-lines { height: 38px; margin-bottom: 8px; background: repeating-linear-gradient(90deg, #111 0 2px, transparent 2px 4px, #111 4px 7px, transparent 7px 10px, #111 10px 11px, transparent 11px 15px, #111 15px 20px, transparent 20px 23px); }
+    .barcode-card:nth-child(2n) .barcode-lines { background-size: 19px 100%; }
+    .barcode-card:nth-child(3n) .barcode-lines { background-size: 27px 100%; }
+    .barcode-label { display: flex; justify-content: space-between; align-items: center; gap: 7px; }
+    .barcode-label strong { font: 900 14px "Consolas", monospace; }
+    .barcode-label span { color: var(--muted); font-size: 10px; }
+    .scan-beam { position: absolute; inset: 8px 8px auto; height: 2px; background: #f22; box-shadow: 0 0 8px #f22; opacity: 0; }
+    .barcode-card.scanning .scan-beam { opacity: 1; animation: scan 1s ease-in-out; }
+    @keyframes scan { 0% { top: 8px; } 50% { top: 47px; } 100% { top: 8px; } }
+
+    .pb1 {
+      width: 74px;
+      height: 74px;
+      padding: 0;
+      border: 0;
+      border-radius: 50%;
+      color: white;
+      background: var(--orange);
+      box-shadow: inset 0 -8px 0 var(--orange-dark), 0 0 0 7px #d0cbc1, 0 0 0 10px #333b40, 0 9px 16px rgba(18,32,42,.25);
+      font-weight: 900;
+      cursor: pointer;
+      transition: transform .12s;
+    }
+    .pb1:active { transform: translateY(5px); box-shadow: inset 0 -3px 0 var(--orange-dark), 0 0 0 7px #d0cbc1, 0 0 0 10px #333b40, 0 4px 8px rgba(18,32,42,.25); }
+    .pb1:disabled { filter: grayscale(1); opacity: .4; cursor: not-allowed; }
+
+    .timer-panel { padding: 22px 24px 26px; }
+    .timer-ring { position: relative; width: min(240px, 72vw); aspect-ratio: 1; margin: 8px auto 24px; border-radius: 50%; background: conic-gradient(var(--orange) var(--progress, 0%), #e2ded3 0); display: grid; place-items: center; }
+    .timer-ring::before { content: ""; position: absolute; inset: 14px; border-radius: 50%; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); }
+    .timer-content { position: relative; z-index: 1; text-align: center; }
+    .timer-content strong { display: block; font: 900 clamp(44px, 6vw, 66px)/.9 "Consolas", monospace; letter-spacing: -.08em; }
+    .timer-content span { color: var(--muted); font-size: 12px; font-weight: 800; }
+    .timer-state { padding: 13px 16px; border-radius: 12px; color: var(--blue-dark); background: #e3f0f4; font-size: 13px; font-weight: 900; text-align: center; }
+
+    .timeline-card { margin-top: 22px; padding: 26px; }
+    .section-intro { display: flex; justify-content: space-between; align-items: end; gap: 20px; margin-bottom: 22px; }
+    .section-intro h2 { margin: 0; font-size: clamp(22px, 3vw, 34px); }
+    .section-intro p { margin: 8px 0 0; color: var(--muted); font-size: 13px; }
+    .legend { display: flex; gap: 14px; color: var(--muted); font-size: 11px; }
+    .legend span { display: flex; align-items: center; gap: 6px; }
+    .legend i { width: 9px; height: 9px; border-radius: 50%; background: #d4d0c6; }
+    .legend .live { background: var(--orange); }
+    .timeline { display: grid; grid-template-columns: repeat(9, minmax(120px,1fr)); gap: 8px; overflow-x: auto; padding-bottom: 8px; }
+    .step { position: relative; min-height: 160px; padding: 16px 14px; border: 1px solid var(--line); border-radius: 14px; background: #f2efe7; transition: .2s; }
+    .step::after { content: "→"; position: absolute; right: -9px; top: 50%; z-index: 2; color: #9ca4a8; font-weight: 900; }
+    .step:last-child::after { display: none; }
+    .step.active { color: white; border-color: var(--blue); background: var(--blue); transform: translateY(-3px); box-shadow: 0 9px 20px rgba(28,109,140,.22); }
+    .step.alert { border-color: var(--danger); background: var(--danger); }
+    .step-no { display: inline-block; margin-bottom: 14px; padding: 5px 8px; border-radius: 7px; color: var(--blue); background: white; font: 900 12px "Consolas", monospace; }
+    .step h3 { margin: 0 0 7px; font-size: 13px; }
+    .step p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.55; }
+    .step.active p { color: rgba(255,255,255,.76); }
+
+    .rules { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 22px; }
+    .rule { padding: 20px; border: 1px solid var(--line); border-radius: 18px; background: rgba(251,250,245,.86); }
+    .rule-number { color: var(--orange); font: 900 12px "Consolas", monospace; }
+    .rule h3 { margin: 10px 0 8px; font-size: 16px; }
+    .rule p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.65; }
+
+    .toast { position: fixed; left: 50%; bottom: 26px; z-index: 50; max-width: min(460px, calc(100% - 32px)); padding: 13px 18px; border-radius: 12px; color: white; background: var(--ink); box-shadow: 0 12px 30px rgba(18,32,42,.3); font-size: 13px; font-weight: 800; transform: translate(-50%, 30px); opacity: 0; pointer-events: none; transition: .24s; }
+    .toast.show { transform: translate(-50%, 0); opacity: 1; }
+    .toast.error { background: var(--danger); }
+
+    footer { padding: 30px 0 0; color: var(--muted); text-align: center; font-size: 11px; }
+
+    @media (max-width: 1080px) {
+      .board-grid { grid-template-columns: 1fr 1fr; }
+      .board-grid .motor-module { grid-column: 1 / -1; }
+      .workspace { grid-template-columns: 1fr; }
+      .timer-layout { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 24px; }
+      .timer-ring { width: 190px; margin: 0; }
+    }
+    @media (max-width: 760px) {
+      main { width: min(100% - 22px, 1440px); padding-top: 30px; }
+      .topbar { padding: 11px 14px; }
+      .brand span, .header-status span { display: none; }
+      .hero { grid-template-columns: 1fr; align-items: start; gap: 20px; }
+      .hero-actions { justify-content: flex-start; }
+      .board-grid { grid-template-columns: 1fr; padding: 12px; }
+      .board-grid .motor-module { grid-column: auto; }
+      .power-panel { align-items: flex-start; }
+      .scanner-toolbar { grid-template-columns: 1fr 1fr; }
+      .scanner-status { grid-column: 1 / -1; }
+      .barcode-grid { grid-template-columns: repeat(2, 1fr); }
+      .timer-layout { display: block; }
+      .timer-ring { width: min(220px, 72vw); margin: 6px auto 22px; }
+      .section-intro { align-items: start; flex-direction: column; }
+      .rules { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 440px) {
+      h1 { font-size: 38px; }
+      .hero-actions .btn { flex: 1; }
+      .board-rail { padding: 12px; }
+      .warning-stripe { width: 90px; }
+      .module { padding: 16px; }
+      .barcode-grid { grid-template-columns: 1fr; }
+      .scanner-toolbar { grid-template-columns: 1fr; }
+      .scanner-toolbar .btn, .pb1 { justify-self: center; }
+      .scanner-status { grid-column: auto; }
+      .pb1 { width: 70px; height: 70px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">工</div>
+      <div><strong>工業配線</strong><span>INDUSTRIAL WIRING LAB</span></div>
+    </div>
+    <div class="header-status"><i id="headerDot" class="status-dot"></i><span id="headerStatus">系統未受電</span></div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div>
+        <p class="eyebrow">術科實作試題・互動動畫</p>
+        <h1>電阻尺 × 變頻馬達<br>× 條碼掃描器</h1>
+        <p>親手調整電阻尺、掃描條碼並按下 PB1，觀察 HMI 暫存器、馬達運轉與越界保護如何依照題目流程即時改變。</p>
+      </div>
+      <div class="hero-actions">
+        <button class="btn primary" id="demoBtn" type="button">▶ 自動示範</button>
+        <button class="btn ghost" id="resetBtn" type="button">↻ 全部重設</button>
+      </div>
+    </section>
+
+    <section class="control-board" aria-label="工業配線設備模擬面板">
+      <div class="board-rail"><span>CONTROL PANEL · CP-01</span><div class="warning-stripe" aria-hidden="true"></div><span>AC 220V</span></div>
+      <div class="board-grid">
+        <article class="module">
+          <div class="module-title"><h2>電阻尺</h2><span class="tag">D200</span></div>
+          <div class="ruler-stage">
+            <div class="ruler-machine" id="rulerVisual" style="--rod-width:42%">
+              <div class="ruler-body"></div><div class="ruler-rod"></div><div class="ruler-handle"></div>
+            </div>
+            <div class="safe-band"><span>10</span><span>允許：50 ≤ 長度 ＜ 190 cm</span><span>200</span></div>
+            <input id="lengthRange" type="range" min="10" max="200" value="120" step="1" aria-label="電阻尺長度">
+            <div class="range-readout"><strong><span id="lengthValue">120</span> cm</strong><span class="range-state" id="rangeState">允許操作</span></div>
+          </div>
+        </article>
+
+        <article class="module">
+          <div class="module-title"><h2>人機介面 HMI</h2><span class="tag">即時監看</span></div>
+          <div class="hmi-shell">
+            <div class="hmi-screen">
+              <div class="hmi-head"><span>DEVICE MONITOR</span><span class="hmi-badge" id="hmiMode">POWER OFF</span></div>
+              <div class="registers">
+                <div class="register"><span class="name">D100</span><strong class="value" id="d100">0</strong><span class="unit">CODE</span></div>
+                <div class="register"><span class="name">D200</span><strong class="value" id="d200">120</strong><span class="unit">cm</span></div>
+                <div class="register"><span class="name">D201</span><strong class="value" id="d201">0</strong><span class="unit">Hz</span></div>
+                <div class="register"><span class="name">D202</span><strong class="value" id="d202">0</strong><span class="unit">RPM</span></div>
+              </div>
+              <div class="hmi-message" id="hmiMessage">請將電源開關切換至 ON。</div>
+            </div>
+          </div>
+        </article>
+
+        <article class="module motor-module">
+          <div class="module-title"><h2>變頻馬達</h2><span class="tag">順時針正轉</span></div>
+          <div class="lamp-row">
+            <div class="lamp-wrap"><div class="lamp gl" id="glLamp"></div>GL 原位</div>
+            <div class="lamp-wrap"><div class="lamp yl" id="ylLamp"></div>YL 警示</div>
+          </div>
+          <div class="motor-stage">
+            <div class="motor" id="motor"><div class="fan"></div><div class="motor-base"></div></div>
+          </div>
+          <div class="motor-data"><div><span>方向</span><strong id="direction">停止</strong></div><div><span>狀態</span><strong id="motorState">STOP</strong></div></div>
+        </article>
+      </div>
+      <div class="power-panel">
+        <div class="power-copy"><strong>主電源開關</strong><span>切換至 ON 後，系統歸零並進入長度檢查。</span></div>
+        <label class="switch"><span>OFF</span><input id="powerSwitch" type="checkbox" aria-label="主電源開關"><span class="switch-track"><span class="switch-knob"></span></span><span>ON</span></label>
+      </div>
+    </section>
+
+    <section class="workspace">
+      <article class="card">
+        <div class="card-head">
+          <div><h2>條碼操作台</h2><p>選一張條碼 → 掃描 → 按下 PB1 寫入 D100 並啟動</p></div>
+          <div class="speed-control" aria-label="動畫速度">
+            <button type="button" data-speed="0.5">0.5×</button><button class="active" type="button" data-speed="1">1×</button><button type="button" data-speed="2">2×</button>
+          </div>
+        </div>
+        <div class="scanner-area">
+          <div class="scanner-toolbar">
+            <div class="scanner-status" id="scannerStatus">已選擇：<strong>HZ:60</strong>　｜　尚未掃描</div>
+            <button class="btn dark" id="scanBtn" type="button">⌁ 掃描條碼</button>
+            <button class="pb1" id="pb1Btn" type="button" disabled>PB1</button>
+          </div>
+          <div class="barcode-grid" id="barcodeGrid">
+            <button class="barcode-card selected" type="button" data-code="HZ:60" data-kind="hz" data-value="60"><i class="scan-beam"></i><div class="barcode-lines"></div><div class="barcode-label"><strong>HZ:60</strong><span>1800 RPM</span></div></button>
+            <button class="barcode-card" type="button" data-code="HZ:50" data-kind="hz" data-value="50"><i class="scan-beam"></i><div class="barcode-lines"></div><div class="barcode-label"><strong>HZ:50</strong><span>1500 RPM</span></div></button>
+            <button class="barcode-card" type="button" data-code="HZ:30" data-kind="hz" data-value="30"><i class="scan-beam"></i><div class="barcode-lines"></div><div class="barcode-label"><strong>HZ:30</strong><span>900 RPM</span></div></button>
+            <button class="barcode-card" type="button" data-code="HZ:20" data-kind="hz" data-value="20"><i class="scan-beam"></i><div class="barcode-lines"></div><div class="barcode-label"><strong>HZ:20</strong><span>600 RPM</span></div></button>
+            <button class="barcode-card" type="button" data-code="RPM:1800" data-kind="rpm" data-value="1800"><i class="scan-beam"></i><div class="barcode-lines"></div><div class="barcode-label"><strong>RPM:1800</strong><span>60 Hz</span></div></button>
+            <button class="barcode-card" type="button" data-code="RPM:1500" data-kind="rpm" data-value="1500"><i class="scan-beam"></i><div class="barcode-lines"></div><div class="barcode-label"><strong>RPM:1500</strong><span>50 Hz</span></div></button>
+            <button class="barcode-card" type="button" data-code="RPM:1200" data-kind="rpm" data-value="1200"><i class="scan-beam"></i><div class="barcode-lines"></div><div class="barcode-label"><strong>RPM:1200</strong><span>40 Hz</span></div></button>
+            <button class="barcode-card" type="button" data-code="RPM:600" data-kind="rpm" data-value="600"><i class="scan-beam"></i><div class="barcode-lines"></div><div class="barcode-label"><strong>RPM:600</strong><span>20 Hz</span></div></button>
+            <button class="barcode-card" type="button" data-code="RPM:300" data-kind="rpm" data-value="300"><i class="scan-beam"></i><div class="barcode-lines"></div><div class="barcode-label"><strong>RPM:300</strong><span>10 Hz</span></div></button>
+          </div>
+        </div>
+      </article>
+
+      <aside class="card timer-panel">
+        <div class="timer-layout">
+          <div class="timer-ring" id="timerRing" style="--progress:0%"><div class="timer-content"><strong id="timerValue">10.0</strong><span>運轉秒數</span></div></div>
+          <div><div class="timer-state" id="timerState">等待啟動</div><p style="color:var(--muted);font-size:12px;line-height:1.7;margin:16px 3px 0">在允許範圍內運轉滿 10 秒後自動停止。若運轉中越界，計時器重置；長度恢復後保留 D100 並重新運轉。</p></div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="card timeline-card">
+      <div class="section-intro"><div><h2>控制程序 1.1 — 1.9</h2><p>目前所在步驟會亮起，跟著設備狀態理解 PLC 程序。</p></div><div class="legend"><span><i class="live"></i>目前步驟</span><span><i></i>等待步驟</span></div></div>
+      <div class="timeline" id="timeline">
+        <article class="step" data-step="1.1"><span class="step-no">1.1</span><h3>初始化</h3><p>馬達停止、暫存器歸零，GL 亮。</p></article>
+        <article class="step" data-step="1.2"><span class="step-no">1.2</span><h3>檢查長度</h3><p>確認 50 ≤ D200 ＜ 190 cm。</p></article>
+        <article class="step" data-step="1.3"><span class="step-no">1.3</span><h3>掃描／PB1</h3><p>掃描條碼，按 PB1 寫入 D100。</p></article>
+        <article class="step" data-step="1.4"><span class="step-no">1.4</span><h3>馬達啟動</h3><p>依指定頻率或轉速順時針運轉。</p></article>
+        <article class="step" data-step="1.5"><span class="step-no">1.5</span><h3>持續監控</h3><p>監看長度與 10 秒計時。</p></article>
+        <article class="step" data-step="1.6"><span class="step-no">1.6</span><h3>正常停止</h3><p>計時到，馬達停止並返回初始化。</p></article>
+        <article class="step" data-step="1.7"><span class="step-no">1.7</span><h3>越界停機</h3><p>馬達立即停止，D201、D202 歸零。</p></article>
+        <article class="step" data-step="1.8"><span class="step-no">1.8</span><h3>YL 閃爍</h3><p>警示燈每秒 ON／OFF，禁止運轉。</p></article>
+        <article class="step" data-step="1.9"><span class="step-no">1.9</span><h3>恢復重啟</h3><p>YL 熄滅，保留 D100，重新計時。</p></article>
+      </div>
+    </section>
+
+    <section class="rules" aria-label="題目重點">
+      <article class="rule"><span class="rule-number">RULE 01</span><h3>操作安全區間</h3><p>電阻尺只有在 50 cm（含）以上且 190 cm（不含）以下時，條碼掃描、PB1 與馬達操作才有效。</p></article>
+      <article class="rule"><span class="rule-number">RULE 02</span><h3>HMI 同步顯示</h3><p>D100 顯示條碼值、D200 顯示實際長度；運轉時 D201／D202 顯示頻率與轉速，停止時歸零。</p></article>
+      <article class="rule"><span class="rule-number">RULE 03</span><h3>越界自動復歸</h3><p>運轉中越界會立即停機並閃爍 YL；恢復安全範圍後保留原條碼，馬達自動重啟並重新計時 10 秒。</p></article>
+    </section>
+    <footer>依「工業配線」術科實作試題製作 · 教學模擬用途 · 頻率／轉速換算採 4 極馬達近似值 RPM = Hz × 30</footer>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    (() => {
+      const $ = (selector) => document.querySelector(selector);
+      const $$ = (selector) => [...document.querySelectorAll(selector)];
+
+      const state = {
+        power: false,
+        length: 120,
+        selected: { code: "HZ:60", kind: "hz", value: 60 },
+        scanned: null,
+        d100: "0",
+        frequency: 0,
+        rpm: 0,
+        running: false,
+        alarm: false,
+        timeLeft: 10,
+        speed: 1,
+        step: null,
+        demoTimers: [],
+        justRecovered: false
+      };
+
+      const el = {
+        power: $("#powerSwitch"), length: $("#lengthRange"), lengthValue: $("#lengthValue"), rangeState: $("#rangeState"),
+        ruler: $("#rulerVisual"), d100: $("#d100"), d200: $("#d200"), d201: $("#d201"), d202: $("#d202"),
+        hmiMode: $("#hmiMode"), hmiMessage: $("#hmiMessage"), gl: $("#glLamp"), yl: $("#ylLamp"), motor: $("#motor"),
+        direction: $("#direction"), motorState: $("#motorState"), scan: $("#scanBtn"), pb1: $("#pb1Btn"), scannerStatus: $("#scannerStatus"),
+        timerRing: $("#timerRing"), timerValue: $("#timerValue"), timerState: $("#timerState"), toast: $("#toast"),
+        headerDot: $("#headerDot"), headerStatus: $("#headerStatus"), demo: $("#demoBtn"), reset: $("#resetBtn")
+      };
+
+      let ticker = null;
+      let flashTicker = null;
+      let toastTimer = null;
+      const inRange = () => state.length >= 50 && state.length < 190;
+
+      function notify(message, error = false) {
+        clearTimeout(toastTimer);
+        el.toast.textContent = message;
+        el.toast.className = "toast show" + (error ? " error" : "");
+        toastTimer = setTimeout(() => el.toast.className = "toast", 2300);
+      }
+
+      function setStep(step, alert = false) {
+        state.step = step;
+        $$(".step").forEach(node => {
+          const active = node.dataset.step === step;
+          node.classList.toggle("active", active);
+          node.classList.toggle("alert", active && alert);
+          if (active) node.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+        });
+      }
+
+      function currentMessage() {
+        if (!state.power) return "請將電源開關切換至 ON。";
+        if (state.alarm) return "長度越界：馬達已停止，等待 D200 回到允許範圍。";
+        if (!inRange()) return "D200 不在允許範圍，掃描與 PB1 操作無效。";
+        if (state.running) return `正轉中｜${state.frequency} Hz｜${state.rpm} RPM｜剩餘 ${state.timeLeft.toFixed(1)} 秒`;
+        if (state.scanned) return `已讀取 ${state.scanned.code}，請按下 PB1 寫入 D100。`;
+        return "系統就緒，請選擇並掃描條碼。";
+      }
+
+      function render() {
+        const safe = inRange();
+        const rod = 12 + ((state.length - 10) / 190) * 50;
+        el.ruler.style.setProperty("--rod-width", `${rod}%`);
+        el.lengthValue.textContent = state.length;
+        el.d200.textContent = state.length;
+        el.rangeState.textContent = safe ? "允許操作" : "禁止操作";
+        el.rangeState.classList.toggle("bad", !safe);
+        el.d100.textContent = state.d100;
+        el.d201.textContent = state.running ? state.frequency : 0;
+        el.d202.textContent = state.running ? state.rpm : 0;
+        el.hmiMode.textContent = !state.power ? "POWER OFF" : state.alarm ? "ALARM" : state.running ? "RUN" : "READY";
+        el.hmiMessage.textContent = currentMessage();
+        el.headerDot.classList.toggle("on", state.power);
+        el.headerStatus.textContent = !state.power ? "系統未受電" : state.alarm ? "越界警示" : state.running ? "自動運轉中" : "系統待機";
+        el.gl.classList.toggle("on", state.power && !state.running && !state.alarm);
+        el.motor.classList.toggle("running", state.running);
+        el.motor.style.setProperty("--spin-speed", `${Math.max(.12, 1.05 - state.rpm / 2100)}s`);
+        el.direction.textContent = state.running ? "順時針" : "停止";
+        el.motorState.textContent = state.running ? "RUN" : state.alarm ? "TRIP" : "STOP";
+        el.scan.disabled = !state.power || !safe || state.running || state.alarm;
+        el.pb1.disabled = !state.power || !safe || !state.scanned || state.running || state.alarm;
+        el.scannerStatus.innerHTML = `已選擇：<strong>${state.selected.code}</strong>　｜　${state.scanned ? `已掃描 <strong>${state.scanned.code}</strong>` : "尚未掃描"}`;
+        el.timerValue.textContent = state.timeLeft.toFixed(1);
+        el.timerRing.style.setProperty("--progress", `${Math.max(0, Math.min(100, (10 - state.timeLeft) * 10))}%`);
+        el.timerState.textContent = state.alarm ? "越界停機 · 等待復歸" : state.running ? "10 秒自動運轉中" : state.timeLeft === 0 ? "本次運轉完成" : "等待啟動";
+      }
+
+      function stopTicker() { clearInterval(ticker); ticker = null; }
+      function stopFlash() { clearInterval(flashTicker); flashTicker = null; el.yl.classList.remove("on"); }
+
+      function initialize(showNotice = true) {
+        stopTicker(); stopFlash();
+        state.scanned = null; state.d100 = "0"; state.frequency = 0; state.rpm = 0;
+        state.running = false; state.alarm = false; state.timeLeft = 10; state.justRecovered = false;
+        setStep(state.power ? (inRange() ? "1.3" : "1.2") : null);
+        render();
+        if (showNotice && state.power) notify("初始化完成：GL 亮，D100／D201／D202 已歸零");
+      }
+
+      function startMotor(recovered = false) {
+        if (!state.power || !inRange() || state.d100 === "0") return;
+        stopTicker(); stopFlash();
+        state.running = true; state.alarm = false; state.timeLeft = 10;
+        setStep(recovered ? "1.9" : "1.4");
+        render();
+        if (recovered) setTimeout(() => state.running && setStep("1.5"), 700 / state.speed);
+        else setTimeout(() => state.running && setStep("1.5"), 600 / state.speed);
+        ticker = setInterval(() => {
+          if (!state.running) return;
+          state.timeLeft = Math.max(0, state.timeLeft - .1 * state.speed);
+          if (state.timeLeft <= 0) {
+            stopTicker(); state.running = false; state.frequency = 0; state.rpm = 0;
+            setStep("1.6"); render(); notify("10 秒到：馬達正常停止，D201／D202 歸零");
+            setTimeout(() => { if (state.power && !state.running && !state.alarm) initialize(false); }, 1000 / state.speed);
+          } else render();
+        }, 100);
+      }
+
+      function tripMotor() {
+        if (!state.running) return;
+        stopTicker(); state.running = false; state.alarm = true; state.timeLeft = 10;
+        setStep("1.7", true); render(); notify("電阻尺越界：馬達立即停止！", true);
+        let lampOn = true; el.yl.classList.add("on");
+        flashTicker = setInterval(() => { lampOn = !lampOn; el.yl.classList.toggle("on", lampOn); }, 1000);
+        setTimeout(() => state.alarm && setStep("1.8", true), 700);
+      }
+
+      function chooseBarcode(card) {
+        $$(".barcode-card").forEach(node => node.classList.remove("selected"));
+        card.classList.add("selected");
+        state.selected = { code: card.dataset.code, kind: card.dataset.kind, value: Number(card.dataset.value) };
+        state.scanned = null; render();
+      }
+
+      function scanSelected() {
+        if (!state.power) return notify("請先開啟主電源。", true);
+        if (!inRange()) return notify("電阻尺不在允許範圍，掃描無效。", true);
+        const card = $(".barcode-card.selected");
+        card.classList.remove("scanning"); void card.offsetWidth; card.classList.add("scanning");
+        state.scanned = { ...state.selected };
+        setStep("1.3"); render(); notify(`條碼 ${state.scanned.code} 讀取完成，請按 PB1`);
+      }
+
+      function pressPB1() {
+        if (!state.scanned || !state.power || !inRange()) return;
+        state.d100 = state.scanned.code;
+        if (state.scanned.kind === "hz") { state.frequency = state.scanned.value; state.rpm = state.scanned.value * 30; }
+        else { state.rpm = state.scanned.value; state.frequency = Math.round((state.scanned.value / 30) * 10) / 10; }
+        render(); startMotor(false); notify(`D100 寫入 ${state.d100}，馬達順時針啟動`);
+      }
+
+      function clearDemo() { state.demoTimers.forEach(clearTimeout); state.demoTimers = []; el.demo.disabled = false; }
+      function later(fn, ms) { const id = setTimeout(fn, ms); state.demoTimers.push(id); }
+      function runDemo() {
+        clearDemo(); initialize(false); state.power = true; el.power.checked = true; state.length = 120; el.length.value = 120;
+        state.selected = { code: "HZ:60", kind: "hz", value: 60 };
+        $$(".barcode-card").forEach(n => n.classList.toggle("selected", n.dataset.code === "HZ:60"));
+        initialize(false); el.demo.disabled = true; notify("自動示範開始：安全運轉 → 越界停機 → 恢復重啟");
+        later(scanSelected, 900); later(pressPB1, 1900);
+        later(() => { state.length = 195; el.length.value = 195; handleLength(); }, 4800);
+        later(() => { state.length = 120; el.length.value = 120; handleLength(); }, 7500);
+        later(() => { el.demo.disabled = false; notify("示範完成，可繼續自行操作"); }, 11500);
+        render();
+      }
+
+      function handleLength() {
+        const wasSafe = inRange();
+        state.length = Number(el.length.value);
+        const safe = inRange();
+        if (state.running && !safe) tripMotor();
+        else if (state.alarm && safe) {
+          state.alarm = false; stopFlash(); render(); notify("長度恢復：保留 D100，馬達重新啟動並重計 10 秒"); startMotor(true);
+        } else if (state.power && !state.running && !state.alarm) setStep(safe ? "1.3" : "1.2");
+        if (wasSafe !== safe) render(); else render();
+      }
+
+      el.power.addEventListener("change", () => {
+        clearDemo(); state.power = el.power.checked;
+        initialize(false);
+        notify(state.power ? "電源 ON：系統初始化完成" : "電源 OFF：系統已斷電");
+      });
+      el.length.addEventListener("input", handleLength);
+      $$(".barcode-card").forEach(card => card.addEventListener("click", () => chooseBarcode(card)));
+      el.scan.addEventListener("click", scanSelected);
+      el.pb1.addEventListener("click", pressPB1);
+      el.demo.addEventListener("click", runDemo);
+      el.reset.addEventListener("click", () => { clearDemo(); state.power = false; el.power.checked = false; state.length = 120; el.length.value = 120; initialize(false); notify("所有狀態已重設"); });
+      $$("[data-speed]").forEach(button => button.addEventListener("click", () => {
+        state.speed = Number(button.dataset.speed); $$("[data-speed]").forEach(b => b.classList.toggle("active", b === button)); notify(`動畫速度調整為 ${state.speed}×`);
+      }));
+
+      initialize(false);
+    })();
+  </script>
+</body>
+</html>
